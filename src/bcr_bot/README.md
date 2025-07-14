@@ -1,320 +1,408 @@
-# BCR Bot
+# Robot SPERO - ROS2 Control System
 
-https://github.com/blackcoffeerobotics/bcr_bot/assets/13151010/0fc570a3-c70c-415b-8222-b9573d5911c8
+Robot SPERO adalah robot tour guide yang dikembangkan untuk navigasi otonom dengan kemampuan dual LiDAR integration (Gazebo + Real-World), multi-mode operation, dan MQTT communication untuk kontrol robot fisik.
 
-## About
+## 🤖 Fitur Robot SPERO
 
-This repository contains a Gazebo and Isaac Sim simulation for a differential drive robot, equipped with an IMU, a depth camera, stereo camera and a 2D LiDAR. The primary contriution of this project is to support multiple ROS and Gazebo distros. Currently, the project supports the following versions - 
+### Multi-Mode Operation
+- **Primary Control**: Navigasi otonom dengan obstacle avoidance
+- **Secondary Control**: Mode cadangan untuk situasi kompleks  
+- **Manual Control**: Kontrol keyboard (WASD)
+- **R-Mode**: Navigasi waypoint terstruktur (6 waypoint)
+- **Navigation Charging**: Auto navigasi ke charging station
+- **Recovery Mode**: Sistem pemulihan saat robot stuck
 
-1. [ROS Noetic + Gazebo Classic 11 (branch ros1)](#noetic--classic-ubuntu-2004)
-2. [ROS2 Humble + Gazebo Classic 11 (branch ros2)](#humble--classic-ubuntu-2204)
-3. [ROS2 Humble + Gazebo Fortress (branch ros2)](#humble--fortress-ubuntu-2204)
-4. [ROS2 Humble + Gazebo Harmonic (branch ros2)](#humble--harmonic-ubuntu-2204)
-5. [ROS2 Humble + Isaac Sim (branch ros2)](#humble--isaac-sim-ubuntu-2204)
+### Dual LiDAR System
+- **Gazebo LiDAR**: Sensor simulasi Gazebo
+- **Real-World LiDAR**: Sensor fisik via MQTT (A1M8)
+- **OR Logic**: Kombinasi data untuk obstacle detection optimal
 
-Each of the following sections describes depedencies, build and run instructions for each of the above combinations
+## 🚀 Quick Start Guide
 
-## Noetic + Classic (Ubuntu 20.04)
-
-### Dependencies
-
-In addition to ROS1 Noetic and Gazebo Classic installations, the dependencies can be installed with [rosdep](http://wiki.ros.org/rosdep)
-
+### 1. Build Workspace
 ```bash
-# From the root directory of the workspace. This will install everything mentioned in package.xml
-rosdep install --from-paths src --ignore-src -r -y
+cd ~/bcr_ws
+colcon build
+source install/setup.bash
 ```
 
-### Source Build
-
+### 2. Setup Environment Variables
 ```bash
-catkin build --packages-select bcr_bot
+export ROS_DOMAIN_ID=0
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/bcr_ws/src/bcr_bot/models
 ```
 
-### Binary Install
-To install BCR bot in the binaries:
+## 🌍 Environment & World Files
 
-```bash
-sudo apt-get install ros-noetic-bcr-bot
-```
-### Run
+### Available Worlds
 
-To launch the robot in Gazebo,
+#### 1. **Gedung P (Original)**
+- **File**: `worlds/gedung_p.world`
+- **Deskripsi**: Model gedung P ukuran asli dengan furnitur lengkap
+- **Launch**:
 ```bash
-roslaunch bcr_bot gazebo.launch
-```
-To view in rviz,
-```bash
-roslaunch bcr_bot rviz.launch
-```
-### Configuration
-
-The launch file accepts multiple launch arguments,
-```bash
-roslaunch bcr_bot gazebo.launch 
-	camera_enabled:=True \
-	two_d_lidar_enabled:=True \
-	position_x:=0.0 \
-	position_y:=0.0 \
-	orientation_yaw:=0.0 \
-	odometry_source:=world \
-	world_file:=small_warehouse.world \
-	robot_namespace:="bcr_bot"
-```
-**Note:** To use stereo_image_proc with the stereo images excute following command: 
-```bash
-ROS_NAMESPACE=bcr_bot/stereo_camera rosrun stereo_image_proc stereo_image_proc
+ros2 launch bcr_bot ign_gedung_p.launch.py
 ```
 
-## Humble + Classic (Ubuntu 22.04)
-
-### Dependencies
-
-In addition to ROS2 Humble and Gazebo Classic installations, we need to manually install [gazebo_ros_pkgs](https://github.com/ros-simulation/gazebo_ros_pkgs/tree/ros2) (since the same branch supports Classic and Fortress)
-
+#### 2. **Gedung P Scaled**
+- **File**: `worlds/gedung_p/gedung_p_scaled.world`
+- **Deskripsi**: Model gedung P yang sudah di-scale untuk navigasi robot yang optimal
+- **Launch**:
 ```bash
-sudo apt-get install ros-humble-gazebo-ros-pkgs
-```
-Remainder of the dependencies can be installed with [rosdep](http://wiki.ros.org/rosdep)
-
-```bash
-# From the root directory of the workspace. This will install everything mentioned in package.xml
-rosdep install --from-paths src --ignore-src -r -y
+ros2 launch bcr_bot ign_gedung_p_scaled.launch.py
 ```
 
-### Source Build
-
+#### 3. **Empty World**
+- **File**: `worlds/empty.sdf`
+- **Deskripsi**: Environment kosong untuk testing dasar
+- **Launch**:
 ```bash
-colcon build --packages-select bcr_bot
+ros2 launch bcr_bot ign.launch.py world:=empty.sdf
 ```
 
-### Binary Install
-To install BCR bot in the binaries:
-
+#### 4. **Small Warehouse**
+- **File**: `worlds/small_warehouse.sdf`
+- **Deskripsi**: Environment warehouse kecil untuk testing
+- **Launch**:
 ```bash
-sudo apt-get install ros-humble-bcr-bot
+ros2 launch bcr_bot ign.launch.py world:=small_warehouse.sdf
 ```
 
-### Run
+## 🗺️ Mapping System
 
-To launch the robot in Gazebo,
-```bash
-ros2 launch bcr_bot gazebo.launch.py
-```
-To view in rviz,
-```bash
-ros2 launch bcr_bot rviz.launch.py
-```
-### Configuration
-
-The launch file accepts multiple launch arguments,
-```bash
-ros2 launch bcr_bot gazebo.launch.py \
-	camera_enabled:=True \
-	two_d_lidar_enabled:=True \
-	stereo_camera_enabled:=False \
-	position_x:=0.0 \
-	position_y:=0.0 \
-	orientation_yaw:=0.0 \
-	odometry_source:=world \
-	world_file:=small_warehouse.sdf \
-	robot_namespace:="bcr_bot"
-```
-**Note:** To use stereo_image_proc with the stereo images excute following command: 
-```bash
-ros2 launch stereo_image_proc stereo_image_proc.launch.py left_namespace:=bcr_bot/stereo_camera/left right_namespace:=bcr_bot/stereo_camera/right
-```
-## Humble + Fortress (Ubuntu 22.04)
-
-### Dependencies
-
-In addition to ROS2 Humble and [Gazebo Fortress installations](https://gazebosim.org/docs/fortress/install_ubuntu), we need to manually install interfaces between ROS2 and Gazebo sim as follows,
+### 1. A1M8 LiDAR Mapping (Recommended)
+**Real-time mapping menggunakan A1M8 LiDAR fisik**
 
 ```bash
-sudo apt-get install ros-humble-ros-gz-sim ros-humble-ros-gz-bridge ros-humble-ros-gz-interfaces 
-```
-Remainder of the dependencies can be installed with [rosdep](http://wiki.ros.org/rosdep)
+# Terminal 1: Start mapping system
+ros2 launch bcr_bot a1m8_mapping.launch.py
 
-```bash
-# From the root directory of the workspace. This will install everything mentioned in package.xml
-rosdep install --from-paths src --ignore-src -r -y
+# Terminal 2: Start robot control
+python3 src/bcr_bot/scripts/roam.py
+
+# Terminal 3: Send mapping command
+python3 src/bcr_bot/scripts/send_a1m8_no_rear.py
 ```
 
-### Source Build
+### 2. Global Mapping (Gazebo + Real LiDAR)
+**Kombinasi data Gazebo dan LiDAR fisik**
 
 ```bash
-colcon build --packages-select bcr_bot
+# Terminal 1: Start global mapping
+ros2 launch bcr_bot global_mapping.launch.py
+
+# Terminal 2: Start robot control  
+python3 src/bcr_bot/scripts/roam.py
 ```
 
-### Binary Install
-To install BCR bot in the binaries:
+### 3. Simple Gazebo Mapping
+**Mapping menggunakan hanya data Gazebo**
 
 ```bash
-sudo apt-get install ros-humble-bcr-bot
-```
+# Terminal 1: Launch Gazebo with world
+ros2 launch bcr_bot ign_gedung_p_scaled.launch.py
 
-### Run
-
-To launch the robot in Gazebo,
-```bash
-ros2 launch bcr_bot ign.launch.py
-```
-To view in rviz,
-```bash
-ros2 launch bcr_bot rviz.launch.py
-```
-
-### Configuration
-
-The launch file accepts multiple launch arguments,
-```bash
-ros2 launch bcr_bot ign.launch.py \
-	camera_enabled:=True \
-	stereo_camera_enabled:=False \
-	two_d_lidar_enabled:=True \
-	position_x:=0.0 \
-	position_y:=0.0  \
-	orientation_yaw:=0.0 \
-	odometry_source:=world \
-	world_file:=small_warehouse.sdf
-```
-**Note:** To use stereo_image_proc with the stereo images excute following command: 
-```bash
-ros2 launch stereo_image_proc stereo_image_proc.launch.py left_namespace:=bcr_bot/stereo_camera/left right_namespace:=bcr_bot/stereo_camera/right
-```
-
-## Humble + Harmonic (Ubuntu 22.04)
-
-### Dependencies
-
-In addition to ROS2 Humble and [Gazebo Harmonic installations](https://gazebosim.org/docs/harmonic/install_ubuntu), we need to manually install interfaces between ROS2 and Gazebo sim as follows,
-
-```bash
-sudo apt-get install ros-humble-ros-gzharmonic
-```
-Remainder of the dependencies can be installed with [rosdep](http://wiki.ros.org/rosdep)
-
-```bash
-# From the root directory of the workspace. This will install everything mentioned in package.xml
-rosdep install --from-paths src --ignore-src -r -y
-```
-
-### Build
-
-```bash
-colcon build --packages-select bcr_bot
-```
-
-### Run
-
-To launch the robot in Gazebo,
-```bash
-ros2 launch bcr_bot gz.launch.py
-```
-To view in rviz,
-```bash
-ros2 launch bcr_bot rviz.launch.py
-```
-
-### Configuration
-
-The launch file accepts multiple launch arguments,
-```bash
-ros2 launch bcr_bot gz.launch.py \
-	camera_enabled:=True \
-	stereo_camera_enabled:=False \
-	two_d_lidar_enabled:=True \
-	position_x:=0.0 \
-	position_y:=0.0  \
-	orientation_yaw:=0.0 \
-	odometry_source:=world \
-	world_file:=small_warehouse.sdf
-```
-**Note:** 
-1. To use stereo_image_proc with the stereo images excute following command: 
-```bash
-ros2 launch stereo_image_proc stereo_image_proc.launch.py left_namespace:=bcr_bot/stereo_camera/left right_namespace:=bcr_bot/stereo_camera/right
-```
-2. Harmonic support is not available in the bcr_bot binaries yet.
-
-**Warning:**  `gz-harmonic` cannot be installed alongside gazebo-classic (eg. gazebo11) since both use the `gz` command line tool.
-
-### Humble + Isaac Sim (Ubuntu 22.04)
-
-### Dependencies
-
-In addition to ROS2 Humble [Isaac Sim installation](https://docs.omniverse.nvidia.com/isaacsim/latest/installation/index.html) with ROS2 extension is required. Remainder of bcr_bot specific dependencies can be installed with [rosdep](http://wiki.ros.org/rosdep)
-
-```bash
-# From the root directory of the workspace. This will install everything mentioned in package.xml
-rosdep install --from-paths src --ignore-src -r -y
-```
-
-### Build
-
-```bash
-colcon build --packages-select bcr_bot
-```
-
-### Run
-
-To launch the robot in Isaac Sim:
-- Open Isaac Sim and load the `warehouse_scene.usd` or `scene.usd` from [here](usd). 
-- Add in extra viewports for different camera views.
-- Start the Simulation: Run the simulation directly within Isaac Sim.
-- The following USDs are included in the package:
-	- `warehouse_scene.usd` - Warehouse scene with a robot.
-	- `scene.usd` - Scene with a robot in a empty world.
-	- `bcr_bot.usd` - Robot model that can be imported into any scene.
-	- `ActionGraphFull.usd` - Action graph for the robot to publish all the required topics.
-
-To view in rviz:
-```bash
-ros2 launch bcr_bot rviz.launch.py
-```
-NOTE: The command to run mapping and navigation is common between all versions of gazebo and Isaac sim see [here](#mapping-with-slam-toolbox).
-
-### Mapping with SLAM Toolbox
-
-SLAM Toolbox is an open-source package designed to map the environment using laser scans and odometry, generating a map for autonomous navigation.
-
-NOTE: The command to run mapping is common between all versions of gazebo.
-
-To start mapping:
-```bash
+# Terminal 2: Start mapping
 ros2 launch bcr_bot mapping.launch.py
+
+# Terminal 3: Start robot control
+python3 src/bcr_bot/scripts/roam.py
 ```
 
-Use the teleop twist keyboard to control the robot and map the area:
+### 4. Physical Robot Mapping
+**Mapping menggunakan robot fisik saja**
+
 ```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard cmd_vel:=/bcr_bot/cmd_vel
+# Start physical mapping
+bash src/bcr_bot/scripts/start_physical_mapping.sh
 ```
 
-To save the map:
+## 🎮 Robot Control
+
+### Manual Control
 ```bash
-cd src/bcr_bot/config
-ros2 run nav2_map_server map_saver_cli -f bcr_map
+# Start main control script
+python3 src/bcr_bot/scripts/roam.py
+
+# Control Keys:
+# W - Forward
+# S - Backward  
+# A - Turn Left
+# D - Turn Right
+# R - Toggle R-mode (waypoint navigation)
+# T - Toggle charging navigation
+# I - Go to Waypoint 0 (Start)
+# Q - Go to Waypoint 5 (MID LEFT) 
+# P - Go to Waypoint 2 (Bottom-right)
 ```
 
-### Using Nav2 with bcr_bot
-
-Nav2 is an open-source navigation package that enables a robot to navigate through an environment easily. It takes laser scan and odometry data, along with the map of the environment, as inputs.
-
-NOTE: The command to run navigation is common between all versions of gazebo and Isaac sim.
-
-To run Nav2 on bcr_bot:
+### MQTT Remote Control
 ```bash
+# Send commands via MQTT
+python3 test_mqtt_send.py
+
+# Available commands:
+# {"command": "start"}
+# {"command": "stop"} 
+# {"command": "waypoint_i"}
+# {"command": "waypoint_q"}
+# {"command": "waypoint_p"}
+```
+
+## 📍 Waypoint Navigation (R-Mode)
+
+Robot SPERO memiliki 6 waypoint yang telah didefinisikan:
+
+```python
+virtual_path = [
+    (0.0, 0.0),         # WP0: Start point
+    (-12.06, -0.02),    # WP1: Bottom-left  
+    (-12.06, -1.79),    # WP2: Bottom-right
+    (15.31, -2.10),     # WP3: Top right
+    (3.57, -2.10),      # WP4: Mid
+    (3.57, 0.0),        # WP5: Mid left
+]
+```
+
+### R-Mode Commands
+```bash
+# Normal R-mode (cycle through all waypoints)
+Press 'R' in roam.py
+
+# Specific waypoint navigation
+Press 'I' - Go to WP0 (Start)
+Press 'Q' - Go to WP5 (MID LEFT)
+Press 'P' - Go to WP2 (Bottom-right)
+```
+
+## 🔧 Configuration Files
+
+### LiDAR Configuration
+- `config/a1m8_mapper_params.yaml` - A1M8 LiDAR parameters
+- `config/a1m8_no_rear_config.yaml` - A1M8 tanpa rear detection
+- `config/mapper_params_physical_lidar.yaml` - Physical LiDAR mapping
+
+### Navigation Configuration  
+- `config/nav2_params.yaml` - Nav2 navigation parameters
+- `config/amcl_params.yaml` - AMCL localization parameters
+- `config/waypoints.yaml` - Waypoint definitions
+
+### Maps
+- `config/gedung_p_map.pgm/.yaml` - Gedung P map files
+- `config/bcr_map.pgm/.yaml` - BCR map files
+
+## 🔄 Launch Files Quick Reference
+
+### Basic Launch
+```bash
+# Gazebo + Robot
+ros2 launch bcr_bot gazebo.launch.py
+
+# Ignition + Robot  
+ros2 launch bcr_bot ign.launch.py
+
+# Gedung P environment
+ros2 launch bcr_bot ign_gedung_p.launch.py
+
+# Gedung P scaled environment
+ros2 launch bcr_bot ign_gedung_p_scaled.launch.py
+```
+
+### Advanced Launch
+```bash
+# With mapping
+ros2 launch bcr_bot mapping.launch.py
+
+# With navigation
 ros2 launch bcr_bot nav2.launch.py
+
+# With RViz visualization
+ros2 launch bcr_bot rviz.launch.py
+
+# LiDAR visualization
+ros2 launch bcr_bot lidar_visual.launch.py
 ```
 
-### Simulation and Visualization
-1. Gz Sim (Ignition Gazebo) (small_warehouse World):
-	![](res/gz.jpg)
+## 🧪 Testing & Debugging
 
-2. Isaac Sim:
-	![](res/isaac.jpg) 
+### LiDAR Testing
+```bash
+# Test A1M8 LiDAR
+python3 src/bcr_bot/scripts/test_lidar_a1m8.py
 
-3. Rviz (Depth camera) (small_warehouse World):
-	![](res/rviz.jpg)
+# Test dual LiDAR integration
+python3 src/bcr_bot/scripts/test_dual_lidar_logic.py
 
+# Test real-world LiDAR
+python3 src/bcr_bot/scripts/test_lidar_real_world.py
+```
 
+### Robot Control Testing
+```bash
+# Test basic robot movement
+python3 src/bcr_bot/scripts/test_robot.py
+
+# Test obstacle avoidance
+python3 src/bcr_bot/scripts/test_obstacle_avoidance.py
+
+# Test charging navigation
+python3 src/bcr_bot/scripts/test_nav_charging.py
+
+# Test MQTT communication
+python3 src/bcr_bot/scripts/test_mqtt_reception.py
+```
+
+### Speed Testing
+```bash
+# Test different movement speeds
+python3 src/bcr_bot/scripts/test_speeds.py
+
+# Test charging speeds
+python3 src/bcr_bot/scripts/test_charging_speeds.py
+```
+
+## 🛠️ Troubleshooting
+
+### Common Issues & Solutions
+
+#### 1. **LiDAR Connection Issues**
+```bash
+# Check LiDAR status
+python3 src/bcr_bot/scripts/check_mqtt_status.py
+
+# Restart LiDAR system
+bash src/bcr_bot/scripts/fix_lidar_issues.sh
+
+# Diagnose LiDAR problems
+python3 src/bcr_bot/scripts/diagnose_lidar_issue.py
+```
+
+#### 2. **MQTT Connection Problems**
+```bash
+# Test MQTT connectivity
+python3 test_mqtt_connectivity.py
+
+# Debug MQTT communication
+python3 test_mqtt_debug.py
+```
+
+#### 3. **Mapping Issues**
+```bash
+# Restart mapping system
+bash src/bcr_bot/scripts/restart_mapping_system.sh
+
+# Check mapping status
+bash src/bcr_bot/scripts/check_mapping_status.sh
+
+# Diagnose mapping problems
+python3 src/bcr_bot/scripts/diagnose_global_mapping.py
+```
+
+#### 4. **Robot Stuck/Recovery**
+```bash
+# Manual recovery
+python3 src/bcr_bot/scripts/test_robot_simple.py
+
+# Quick restart roam
+bash src/bcr_bot/scripts/quick_restart_roam.sh
+```
+
+## 📊 Monitoring & Visualization
+
+### RViz Configurations
+- `rviz/entire_setup.rviz` - Complete system view
+- `rviz/lidar_visual.rviz` - LiDAR data visualization  
+- `rviz/global_mapping.rviz` - Mapping process view
+- `rviz/a1m8_mapping.rviz` - A1M8 LiDAR mapping
+
+### Real-time Monitoring
+```bash
+# Monitor robot status
+ros2 topic echo /bcr_bot/cmd_vel
+
+# Monitor LiDAR data
+ros2 topic echo /bcr_bot/scan
+
+# Monitor odometry
+ros2 topic echo /bcr_bot/odom
+
+# Monitor physical LiDAR
+ros2 topic echo /bcr_bot/physical_scan
+```
+
+## 🔧 Advanced Configuration
+
+### LiDAR Thresholds
+```python
+obstacle_threshold = 1.5          # Obstacle detection (m)
+emergency_stop_threshold = 0.25   # Emergency stop (m)  
+charging_obstacle_threshold = 1.2 # Charging navigation (m)
+```
+
+### Movement Parameters
+```python
+forward_speed = 1.6               # Normal forward speed
+turn_speed = 1.5                  # Normal turn speed
+charging_forward_speed = 0.5      # Charging navigation speed
+charging_turn_speed = 0.8         # Charging turn speed
+```
+
+### Battery Management
+```python
+battery_low_threshold = 11.0      # Low battery voltage (V)
+charging_station_pos = (0.0, 0.0) # Charging station coordinates
+```
+
+## 🚁 Full System Launch (Recommended Workflow)
+
+### For Gedung P Scaled Environment:
+```bash
+# Terminal 1: Launch Gazebo environment
+ros2 launch bcr_bot ign_gedung_p_scaled.launch.py
+
+# Terminal 2: Launch mapping (if needed)
+ros2 launch bcr_bot a1m8_mapping.launch.py
+
+# Terminal 3: Launch robot control
+python3 src/bcr_bot/scripts/roam.py
+
+# Terminal 4: Launch RViz for visualization
+ros2 launch bcr_bot rviz.launch.py config:=entire_setup.rviz
+```
+
+### For Empty Environment Testing:
+```bash
+# Terminal 1: Launch empty world
+ros2 launch bcr_bot ign.launch.py world:=empty.sdf
+
+# Terminal 2: Launch robot control
+python3 src/bcr_bot/scripts/roam.py
+
+# Terminal 3: Test specific features
+python3 src/bcr_bot/scripts/test_obstacle_avoidance.py
+```
+
+## 📞 Support & Documentation
+
+### Additional Documentation
+- `scripts/README_robot_control.md` - Detailed robot control guide
+- `scripts/README_lidar_setup.md` - LiDAR setup instructions  
+- `scripts/TROUBLESHOOTING_MAPPING.md` - Mapping troubleshooting
+- `scripts/MQTT_DISCONNECT_FIX.md` - MQTT connection fixes
+
+### Quick Help Scripts
+```bash
+# Complete system test
+python3 src/bcr_bot/scripts/run_complete_test.py
+
+# Quick robot verification
+python3 src/bcr_bot/scripts/verify_test_robot.py
+
+# Communication test
+python3 src/bcr_bot/scripts/test_communication.py
+```
+
+---
+
+**Developed for Robot SPERO Tour Guide Project**  
+*Tugas Akhir Simulasi Robot SPERO dan Kontrol Robot SPERO* 
