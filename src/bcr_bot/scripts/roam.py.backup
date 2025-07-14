@@ -1,0 +1,505 @@
+#!/usr/bin/env python3
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg import LaserScan
+from nav_msgs.msg import Odometry
+import math
+import threading
+import sys
+import select
+import time
+import tty
+import termios
+import os
+import signal
+import queue
+import random
+
+class RoamingRobot(Node):
+    def __init__(self):
+        super().__init__('roaming_robot')
+        self.last_odom_pos = None
+        self.cmd_vel_pub = self.create_publisher(Twist, '/bcr_bot/cmd_vel', 10)
+        self.scan_sub = self.create_subscription(LaserScan, '/bcr_bot/scan', self.scan_callback, 10)
+        self.odom_sub = self.create_subscription(Odometry, '/bcr_bot/odom', self.odom_callback, 10)
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.obstacle_detected = False
+        self.lidar_too_close = False
+        self.lidar_min_distance = float('inf')
+        self.turning = False
+        self.stop_before_turn = False
+        self.stop_timer = None
+        self.backing_up = False
+        self.backup_start_time = None
+        self.backup_duration = 0
+        self.manual_mode = False
+        self.is_scanning = False
+        self.scan_start_time = 0
+        self.scan_duration = 3.0
+        self.best_angle = 0
+        self.turning_to_best = False
+        self.turn_start_time = 0
+        self.turn_duration = 1.0
+        self.running = True
+        self.old_settings = termios.tcgetattr(sys.stdin)
+        tty.setcbreak(sys.stdin.fileno())
+        signal.signal(signal.SIGINT, self.signal_handler)
+        os.system('clear')
+        self.print_instructions()
+        self.status_queue = queue.Queue()
+        self.stuck_counter = 0
+        self.max_stuck = 20
+        self.last_turn_time = time.time()
+        self.turn_timeout = 3.0
+        self.obstacle_threshold = 0.8 # meters
+        self.emergency_stop_threshold = 0.4  # meters
+        self.scan_data = None
+        self.rotation_progress = 0
+        self.last_input_time = time.time()
+        self.status = 'Waiting for input...'
+        self.last_status = ''
+        # For stuck detection
+        self.last_odom_time = time.time()
+        self.stuck_check_interval = 3.0
+        self.stuck_threshold = 0.02
+        self.stuck_unstuck = False
+        self.stuck_unstuck_start = None
+        self.stuck_unstuck_duration = 0
+        self.last_positions = []
+        self.max_positions = 10
+        # For secondary detector
+        self.secondary_active = False
+        self.secondary_start_time = None
+        self.secondary_duration = 20.0  # 20 seconds of secondary control
+        self.left_obstacle = False
+        self.right_obstacle = False
+        self.print_status('Waiting for input...')
+        self.stuck = False
+        self.recovery_phase = 0
+        self.recovery_end_time = 0
+        self.last_key_time = time.time()
+        self.manual_timeout = 5.0  # seconds
+        
+        # Initialize Twist message for cmd_vel
+        self.cmd_vel = Twist()
+
+    def signal_handler(self, signum, frame):
+        print('\n\nShutting down...')
+        self.running = False
+        self.cleanup()
+        rclpy.shutdown()
+        sys.exit(0)
+
+    def __del__(self):
+        # Restore terminal settings
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
+
+    def getch(self):
+        try:
+            return sys.stdin.read(1)
+        except:
+            return None
+
+    def update_status(self, message):
+        self.status_queue.put(message)
+
+    def print_status(self, status):
+        self.status = status
+        timestamp = time.strftime('%H:%M:%S')
+        status_line = f'[{timestamp}] {status}'
+        if self.last_odom_pos is not None:
+            status_line += f' | Pos: x={self.last_odom_pos[0]:.2f} y={self.last_odom_pos[1]:.2f} z={self.last_odom_pos[2]:.2f}'
+        else:
+            status_line += ' | Pos: unknown'
+        columns = os.get_terminal_size().columns
+        sys.stdout.write('\r' + status_line.ljust(columns - 1))
+        sys.stdout.flush()
+        self.last_status = status
+
+    def print_warning(self, warning):
+        timestamp = time.strftime('%H:%M:%S')
+        print(f'\n\033[91m[{timestamp}] WARNING: {warning}\033[0m')
+        # Reprint the last status line after the warning
+        sys.stdout.write(f'\r\033[K[{timestamp}] {self.status}')
+        sys.stdout.flush()
+
+    def keyboard_listener(self):
+        while self.running:
+            try:
+                if select.select([sys.stdin], [], [], 0.1)[0]:
+                    key = self.getch()
+                    if key is None:
+                        continue
+                        
+                    key = key.lower()
+                    if key in ['w', 'a', 's', 'd']:
+                        self.handle_key(key)
+                else:
+                    # Check for timeout (5 seconds)
+                    if self.manual_mode and (time.time() - self.last_input_time > 5.0):
+                        self.manual_mode = False
+                        self.update_status('Auto-roaming mode')
+            except Exception as e:
+                self.update_status(f'Error: {str(e)}')
+            time.sleep(0.05)
+
+    def handle_key(self, key):
+        """Handle keyboard input and set robot velocity"""
+        twist = Twist()
+        
+        if key == 'w':
+            twist.linear.x = 1.0  # Move forward
+            twist.angular.z = 0.0
+            self.print_status('Manual: Moving forward')
+        elif key == 's':
+            twist.linear.x = -1.0  # Move backward
+            twist.angular.z = 0.0
+            self.print_status('Manual: Moving backward')
+        elif key == 'a':
+            twist.linear.x = 0.0  # Stop forward/backward motion
+            twist.angular.z = 1.0  # Turn left (positive angular velocity)
+            self.print_status('Manual: Turning left')
+        elif key == 'd':
+            twist.linear.x = 0.0  # Stop forward/backward motion
+            twist.angular.z = -1.0  # Turn right (negative angular velocity)
+            self.print_status('Manual: Turning right')
+        else:
+            twist.linear.x = 0.0
+            twist.angular.z = 0.0
+            self.print_status('Manual: Stopped')
+            
+        self.cmd_vel_pub.publish(twist)
+
+    def scan_callback(self, msg):
+        self.scan_data = msg
+        total_points = len(msg.ranges)
+        sector_size = total_points // 12
+        
+        # Debug: Print total points and sector size
+        self.print_status(f'LiDAR: {total_points} points, sector size: {sector_size}')
+        
+        # Only process primary detection if secondary is not active
+        if not self.secondary_active:
+            # Primary detector - wider front sector for better detection at high speed
+            front_sector = msg.ranges[sector_size*4:sector_size*8]  # -60 to +60 degrees
+            front_readings = [d for d in front_sector if d > 0.0 and d < msg.range_max]
+            
+            # Debug: Print front sector readings
+            if front_readings:
+                self.lidar_min_distance = min(front_readings)
+                self.print_status(f'Front sector: {len(front_readings)} readings, min: {self.lidar_min_distance:.2f}m')
+                
+                if self.lidar_min_distance < self.emergency_stop_threshold:
+                    self.obstacle_detected = True
+                    self.lidar_too_close = True
+                    self.print_warning(f'EMERGENCY STOP! Object at {self.lidar_min_distance:.2f}m')
+                elif self.lidar_min_distance < self.obstacle_threshold:
+                    self.obstacle_detected = True
+                    self.lidar_too_close = False
+                    self.print_status(f'Primary: Front obstacle at {self.lidar_min_distance:.2f}m (threshold: {self.obstacle_threshold:.2f}m)')
+                else:
+                    self.obstacle_detected = False
+                    self.lidar_too_close = False
+                    self.print_status(f'Primary: No obstacle (min distance: {self.lidar_min_distance:.2f}m)')
+            else:
+                self.lidar_min_distance = float('inf')
+                self.obstacle_detected = False
+                self.lidar_too_close = False
+                self.print_status('Primary: No valid readings in front sector')
+        
+        # Always process secondary detection
+        left_sector = msg.ranges[sector_size*0:sector_size*4]  # 0 to 120 degrees
+        right_sector = msg.ranges[sector_size*8:sector_size*12]  # -120 to 0 degrees
+        
+        left_readings = [d for d in left_sector if d > 0.0 and d < msg.range_max]
+        right_readings = [d for d in right_sector if d > 0.0 and d < msg.range_max]
+        
+        left_min = min(left_readings, default=float('inf'))
+        right_min = min(right_readings, default=float('inf'))
+        
+        # Debug: Print secondary readings
+        self.print_status(f'Secondary: L={left_min:.2f}m ({len(left_readings)} readings), R={right_min:.2f}m ({len(right_readings)} readings)')
+        
+        # More sensitive secondary detection with higher threshold for high speed
+        self.left_obstacle = left_min < 0.8  # Increased from 0.5 to 0.8
+        self.right_obstacle = right_min < 0.8  # Increased from 0.5 to 0.8
+        
+        # Activate secondary if obstacles detected and not already active
+        if not self.secondary_active and (self.left_obstacle or self.right_obstacle):
+            self.secondary_active = True
+            self.secondary_start_time = time.time()
+            self.obstacle_detected = False  # Disable primary detection
+            self.print_status('Secondary detector taking control for 20 seconds...')
+
+    def odom_callback(self, msg):
+        pos = msg.pose.pose.position
+        current_pos = (pos.x, pos.y, pos.z)
+        now = time.time()
+        
+        if self.last_odom_pos is not None:
+            dist = ((current_pos[0] - self.last_odom_pos[0]) ** 2 +
+                    (current_pos[1] - self.last_odom_pos[1]) ** 2 +
+                    (current_pos[2] - self.last_odom_pos[2]) ** 2) ** 0.5
+                    
+            if dist > self.stuck_threshold:
+                self.last_odom_time = now
+                self.stuck_counter = 0
+            else:
+                self.stuck_counter += 1
+                if self.stuck_counter > self.max_stuck and not self.stuck_unstuck:
+                    self.stuck_unstuck = True
+                    self.stuck_unstuck_start = now
+                    self.stuck_unstuck_duration = random.uniform(15.0, 30.0)  # Recovery between 15-30 seconds
+                    self.print_warning('Robot appears stuck! Starting recovery...')
+                
+        self.last_odom_pos = current_pos
+
+    def avoid_obstacle(self):
+        """Enhanced obstacle avoidance behavior"""
+        if not self.scan_data:
+            return None
+            
+        twist = Twist()
+        
+        # Define distinct sectors for left, front, and right
+        total_points = len(self.scan_data.ranges)
+        sector_size = total_points // 12  # Divide into 12 sectors for finer control
+        
+        # Left sector (approximately 60-120 degrees)
+        left_sector = self.scan_data.ranges[sector_size*4:sector_size*6]
+        # Right sector (approximately -60 to -120 degrees)
+        right_sector = self.scan_data.ranges[sector_size*6:sector_size*8]
+        
+        # Calculate minimum distances for each sector
+        left_min = min([d for d in left_sector if d > 0.0 and d < self.scan_data.range_max], default=float('inf'))
+        right_min = min([d for d in right_sector if d > 0.0 and d < self.scan_data.range_max], default=float('inf'))
+        
+        # If both sides are blocked, do a 360 scan
+        if left_min < 0.3 and right_min < 0.3:  # Reduced from 0.5 to 0.3
+            self.is_scanning = True
+            self.scan_start_time = time.time()
+            self.print_status('Both sides blocked, starting 360° scan...')
+            twist.linear.x = 0.0
+            twist.angular.z = 1.0
+            return twist
+            
+        # If obstacle is on the left, turn right
+        if left_min < 0.4:  # Reduced from obstacle_threshold to 0.4
+            twist.linear.x = 0.0
+            twist.angular.z = -1.0  # Turn right
+            self.print_status('Obstacle on left, turning right')
+        # If obstacle is on the right, turn left
+        elif right_min < 0.4:  # Reduced from obstacle_threshold to 0.4
+            twist.linear.x = 0.0
+            twist.angular.z = 1.0  # Turn left
+            self.print_status('Obstacle on right, turning left')
+        else:
+            # No obstacles detected, move forward
+            twist.linear.x = 1.0
+            twist.angular.z = 0.0
+            self.print_status('No obstacles, moving forward')
+            
+        return twist
+
+    def timer_callback(self):
+        if self.stuck:
+            # Recovery sequence
+            if self.recovery_phase == 0:  # Backup phase
+                self.cmd_vel.linear.x = -1.5  # Increased by 1.0
+                self.cmd_vel.angular.z = 0.0
+                self.recovery_phase = 1
+                self.print_status("Recovery: Backing up...")
+            elif self.recovery_phase == 1:  # Turn phase
+                # Randomly choose turn direction and duration
+                turn_direction = 1.0 if random.random() > 0.5 else -1.0
+                turn_duration = random.uniform(20.0, 45.0)  # 20-45 seconds
+                self.cmd_vel.linear.x = 0.0
+                self.cmd_vel.angular.z = turn_direction * 1.5  # Increased by 1.0
+                self.recovery_phase = 2
+                self.print_status(f"Recovery: Turning {'left' if turn_direction > 0 else 'right'} for {turn_duration:.1f}s")
+                # Set a timer to end the turn phase
+                self.recovery_end_time = time.time() + turn_duration
+            elif self.recovery_phase == 2:  # Wait for turn to complete
+                if time.time() >= self.recovery_end_time:
+                    self.stuck = False
+                    self.recovery_phase = 0
+                    self.cmd_vel.linear.x = 0.0
+                    self.cmd_vel.angular.z = 0.0
+                    self.print_status("Recovery complete, resuming normal operation")
+            self.cmd_vel_pub.publish(self.cmd_vel)
+            return
+
+        # Check if secondary control should end
+        if self.secondary_active:
+            if time.time() - self.secondary_start_time >= self.secondary_duration:
+                self.secondary_active = False
+                self.print_status('Returning control to primary detector')
+            else:
+                # Secondary detector is active
+                if self.left_obstacle and not self.right_obstacle:
+                    # If left obstacle is far enough, just move forward
+                    if left_min > 0.6:  # If more than 0.6m away, don't turn
+                        self.cmd_vel.linear.x = 1.4
+                        self.cmd_vel.angular.z = 0.0
+                        self.print_status("Secondary: Moving forward (left obstacle far enough)")
+                    else:
+                        self.cmd_vel.linear.x = 0.0
+                        self.cmd_vel.angular.z = -1.5  # Turn right
+                        self.print_status("Secondary: Turning right (left obstacle too close)")
+                elif self.right_obstacle and not self.left_obstacle:
+                    # If right obstacle is far enough, just move forward
+                    if right_min > 0.6:  # If more than 0.6m away, don't turn
+                        self.cmd_vel.linear.x = 1.4
+                        self.cmd_vel.angular.z = 0.0
+                        self.print_status("Secondary: Moving forward (right obstacle far enough)")
+                    else:
+                        self.cmd_vel.linear.x = 0.0
+                        self.cmd_vel.angular.z = 1.5  # Turn left
+                        self.print_status("Secondary: Turning left (right obstacle too close)")
+                elif self.left_obstacle and self.right_obstacle:
+                    # In narrow hallway, try to center between obstacles
+                    if left_min > 0.4 and right_min > 0.4:  # If both sides have enough space
+                        self.cmd_vel.linear.x = 1.4
+                        self.cmd_vel.angular.z = 0.0
+                        self.print_status("Secondary: Moving forward in hallway")
+                    else:
+                        # If too close to one side, make small adjustment
+                        if left_min < right_min:
+                            self.cmd_vel.linear.x = 0.7
+                            self.cmd_vel.angular.z = -0.5  # Small right turn
+                            self.print_status("Secondary: Adjusting right in hallway")
+                        else:
+                            self.cmd_vel.linear.x = 0.7
+                            self.cmd_vel.angular.z = 0.5  # Small left turn
+                            self.print_status("Secondary: Adjusting left in hallway")
+                else:
+                    self.cmd_vel.linear.x = 1.4
+                    self.cmd_vel.angular.z = 0.0
+                    self.print_status("Secondary: Moving forward (no obstacles)")
+                self.cmd_vel_pub.publish(self.cmd_vel)
+                return
+
+        # Primary detector control (only when secondary is not active)
+        if self.obstacle_detected:
+            if self.lidar_too_close:
+                # Emergency stop
+                self.cmd_vel.linear.x = 0.0
+                self.cmd_vel.angular.z = 0.0
+                self.print_warning("EMERGENCY STOP - Too close to obstacle!")
+            else:
+                # Primary obstacle avoidance - turn right when obstacle detected
+                self.cmd_vel.linear.x = 0.0
+                self.cmd_vel.angular.z = -1.5  # Increased by 1.0
+                self.print_status("Primary: Turning right to avoid obstacle")
+        else:
+            # No obstacles detected, move forward
+            self.cmd_vel.linear.x = 1.6  # Increased by 1.0
+            self.cmd_vel.angular.z = 0.0
+            self.print_status("Moving forward")
+            
+        self.cmd_vel_pub.publish(self.cmd_vel)
+
+    def print_instructions(self):
+        print('\n' + '='*50)
+        print(' '*15 + 'MANUAL CONTROL MODE')
+        print('='*50)
+        print('W: Move Forward')
+        print('S: Move Backward')
+        print('A: Turn Left')
+        print('D: Turn Right')
+        print('\nPress any WASD key to start manual control...')
+        print('Auto-roaming resumes after 5s of no input')
+        print('Press Ctrl+C to exit')
+        print('='*50 + '\n')
+
+    def check_for_obstacles(self):
+        if self.scan_data is None:
+            return False
+            
+        # Check if any scan points are closer than threshold
+        for distance in self.scan_data.ranges:
+            if distance < self.obstacle_threshold and distance > 0.0:
+                self.get_logger().info(f'Obstacle detected at distance: {distance}')
+                return True
+        return False
+
+    def find_best_direction(self):
+        """Find the direction with the most free space"""
+        if self.scan_data is None:
+            return 0
+            
+        # Divide scan into 8 sectors
+        sector_size = len(self.scan_data.ranges) // 8
+        max_distance = 0
+        best_sector = 0
+        
+        for i in range(8):
+            start_idx = i * sector_size
+            end_idx = (i + 1) * sector_size
+            sector_distances = self.scan_data.ranges[start_idx:end_idx]
+            valid = [d for d in sector_distances if d > 0]
+            avg_distance = sum(valid) / len(valid) if valid else 0
+            
+            if avg_distance > max_distance:
+                max_distance = avg_distance
+                best_sector = i
+                
+        # Convert sector to angle (-180 to 180 degrees)
+        angle = (best_sector * 45) - 180
+        return angle
+
+    def check_input(self):
+        try:
+            if select.select([sys.stdin], [], [], 0)[0]:
+                key = sys.stdin.read(1)
+                self.handle_key(key)
+                self.last_input_time = time.time()
+                self.manual_mode = True
+                self.is_scanning = False
+                self.turning_to_best = False
+            elif time.time() - self.last_input_time > 5.0:
+                self.manual_mode = False
+                self.auto_roam()
+        except Exception as e:
+            self.get_logger().error(f'Error in check_input: {str(e)}')
+
+    def cleanup(self):
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
+        twist = Twist()
+        twist.linear.x = 0.0
+        twist.angular.z = 0.0
+        self.cmd_vel_pub.publish(twist)
+        print('\nRobot stopped')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = RoamingRobot()
+    
+    try:
+        while True:
+            rclpy.spin_once(node, timeout_sec=0.1)
+            # Keyboard input
+            if select.select([sys.stdin], [], [], 0)[0]:
+                key = sys.stdin.read(1)
+                node.handle_key(key)
+                node.manual_mode = True
+                node.last_input_time = time.time()
+            elif node.manual_mode and (time.time() - node.last_input_time > 5.0):
+                node.manual_mode = False
+                node.print_status('Auto-roaming mode')
+    except KeyboardInterrupt:
+        print('\n\nShutting down...')
+        node.cleanup()
+        node.destroy_node()
+        rclpy.shutdown()
+        sys.exit(0)
+    except Exception as e:
+        print(f'\n\nError: {str(e)}')
+        node.cleanup()
+        node.destroy_node()
+        rclpy.shutdown()
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main() 

@@ -1,0 +1,30 @@
+---
+- ros_topic_name: "/bcr_bot/cmd_vel"
+  gz_topic_name: "/model/spero/cmd_vel"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  gz_type_name: "gz.msgs.Twist"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/bcr_bot/odom"
+  gz_topic_name: "/model/spero/odometry"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/bcr_bot/scan"
+  gz_topic_name: "/model/spero/lidar/scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/bcr_bot/imu"
+  gz_topic_name: "/model/spero/imu"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  gz_type_name: "gz.msgs.IMU"
+  direction: BIDIRECTIONAL
+
+- ros_topic_name: "/tf"
+  gz_topic_name: "/model/spero/tf"
+  ros_type_name: "tf2_msgs/msg/TFMessage"
+  gz_type_name: "gz.msgs.Pose_V"
+  direction: BIDIRECTIONAL 

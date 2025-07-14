@@ -1,0 +1,48 @@
+<model name='gedung_p'>
+  <static>true</static>
+  <pose>0 0 0 0 0 0</pose>
+  <link name='link'>
+    <collision name='collision'>
+      <geometry>
+        <box>
+          <size>1 1 1</size>
+        </box>
+      </geometry>
+      <pose>0 0 0.5 0 0 0</pose>
+      <max_contacts>10</max_contacts>
+      <surface>
+        <contact>
+          <collide_without_contact>true</collide_without_contact>
+        </contact>
+        <bounce/>
+        <friction>
+          <ode/>
+        </friction>
+      </surface>
+    </collision>
+    <visual name='visual'>
+      <geometry>
+        <box>
+          <size>1 1 1</size>
+        </box>
+      </geometry>
+      <pose>0 0 0.5 0 0 0</pose>
+      <material>
+        <script>
+          <uri>file://media/materials/scripts/gazebo.material</uri>
+          <name>Gazebo/Grey</name>
+        </script>
+        <ambient>1 1 1 1</ambient>
+      </material>
+      <meta>
+        <layer>0</layer>
+      </meta>
+    </visual>
+    <enable_wind>false</enable_wind>
+    <kinematic>false</kinematic>
+    <gravity>true</gravity>
+    <self_collide>false</self_collide>
+  </link>
+  <pose>0 0 0 0 0 0</pose>
+  <allow_auto_disable>true</allow_auto_disable>
+</model> 

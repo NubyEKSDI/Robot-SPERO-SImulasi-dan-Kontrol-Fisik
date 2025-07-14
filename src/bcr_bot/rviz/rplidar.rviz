@@ -1,0 +1,47 @@
+Visualization Manager:
+  Class: ""Visualization Manager""
+  Displays:
+    - Class: "rviz_default_plugins/LaserScan"
+      Name: "RPLIDAR Scan"
+      Enabled: true
+      Topic: "/scan"
+      Queue Size: 10
+      Style: "Flat Squares"
+      Size (m): 0.03
+      Color: 255; 25; 0
+      Alpha: 1.0
+      Decay Time: 0.2
+      Position Transformer: "XYZ"
+      Color Transformer: "Intensity"
+      Channel Name: ""
+      Use rainbow: false
+      Min Intensity: 0.0
+      Max Intensity: 4096.0
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds: true
+      Value min: 0.0
+      Value max: 1.0
+      Unreliable: false
+      Filtered: false
+      Invert Rainbow: false
+      Use Fixed Frame: false
+      Fixed Frame: "laser"
+  Enabled: true
+  Global Options:
+    Fixed Frame: "laser"
+  Tools:
+    - Class: "rviz_default_plugins/Interact"
+    - Class: "rviz_default_plugins/MoveCamera"
+    - Class: "rviz_default_plugins/Select"
+    - Class: "rviz_default_plugins/FocusCamera"
+    - Class: "rviz_default_plugins/Measure"
+    - Class: "rviz_default_plugins/SetInitialPose"
+    - Class: "rviz_default_plugins/SetGoal"
+  Views:
+    Current:
+      Class: "rviz_default_plugins/Orbit"
+      Distance: 5.0
+      Focal Point: [0, 0, 0]
+      Pitch: 0.785
+      Yaw: 0.785
+      Target Frame: "laser" 

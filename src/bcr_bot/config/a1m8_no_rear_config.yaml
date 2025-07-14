@@ -1,0 +1,64 @@
+# A1M8 LiDAR Configuration - NO REAR DETECTION
+# This configuration excludes the rear sector from LiDAR detection
+
+a1m8_lidar:
+  ros__parameters:
+    # LiDAR basic parameters
+    angle_min: -3.14159  # -180 degrees
+    angle_max: 3.14159   # +180 degrees
+    angle_increment: 0.0174533  # 1 degree in radians
+    range_min: 0.15      # 15cm minimum range for A1M8
+    range_max: 12.0      # 12m maximum range for A1M8
+    
+    # Rear sector exclusion configuration
+    rear_exclusion_enabled: true
+    rear_start_angle: 135  # degrees - start of rear sector to exclude
+    rear_end_angle: 225    # degrees - end of rear sector to exclude
+    
+    # Processing parameters
+    window_size: 10        # Number of points around target angle to average
+    valid_range_min: 0.15  # Minimum valid range in meters
+    valid_range_max: 12.0  # Maximum valid range in meters
+    
+    # MQTT configuration
+    mqtt_broker: "codex.petra.ac.id"
+    mqtt_port: 1883
+    mqtt_topic_lidar_data: "robot/lidar/real_world_data"
+    mqtt_topic_status: "robot/lidar/a1m8_status"
+    
+    # Logging configuration
+    log_interval: 3.0      # Seconds between status logs
+    debug_enabled: true    # Enable debug logging
+    
+    # Test scenarios for simulation
+    test_scenarios:
+      clear:
+        name: "Clear Path"
+        front_distance: 5.0
+        left_distance: 3.0
+        right_distance: 3.0
+      front_obstacle:
+        name: "Front Obstacle"
+        front_distance: 0.8
+        left_distance: 3.0
+        right_distance: 3.0
+      left_obstacle:
+        name: "Left Obstacle"
+        front_distance: 5.0
+        left_distance: 0.5
+        right_distance: 3.0
+      right_obstacle:
+        name: "Right Obstacle"
+        front_distance: 5.0
+        left_distance: 3.0
+        right_distance: 0.5
+      both_sides:
+        name: "Both Sides Blocked"
+        front_distance: 5.0
+        left_distance: 0.4
+        right_distance: 0.4
+      close_front:
+        name: "Close Front Obstacle"
+        front_distance: 0.3
+        left_distance: 3.0
+        right_distance: 3.0 

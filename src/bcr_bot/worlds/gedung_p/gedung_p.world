@@ -1,0 +1,204 @@
+<?xml version='1.0'?>
+<sdf version='1.6'>
+  <world name='default'>
+    <light name='sun' type='directional'>
+      <cast_shadows>1</cast_shadows>
+      <pose>0 0 30 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>3000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name='ground_plane'>
+      <static>true</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>1200 1200</size>
+            </plane>
+          </geometry>
+          <surface>
+            <contact>
+              <collide_bitmask>65535</collide_bitmask>
+            </contact>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <cast_shadows>false</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>1200 1200</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.8 0.8 0.8 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <gravity>0 0 -9.8</gravity>
+    <atmosphere type='adiabatic'/>
+    
+    <physics name='default_physics' default='true' type='ode'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <max_contacts>5</max_contacts>
+      <contact_max_correcting_vel>1.0</contact_max_correcting_vel>
+      <contact_surface_layer>0.01</contact_surface_layer>
+    </physics>
+    
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <!-- Include Gedung P building model with corrected offset -->
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/gedung_p/model.sdf</uri>
+      <pose>2.96636 -2.09069 0 0 0 0</pose>
+    </include>
+
+    <!-- Cafeteria Tables - All 8 tables with offset removed -->
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_001</name>
+      <pose>-9.84676 0.606083 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_002</name>
+      <pose>-8.935 0.590761 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_003</name>
+      <pose>-8.02224 0.609026 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_004</name>
+      <pose>-7.24941 0.617836 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_005</name>
+      <pose>-5.00888 0.725093 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_006</name>
+      <pose>-3.99707 1.03898 0 0 0 0.766666</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_007</name>
+      <pose>-3.43079 1.60452 0 0 0 0.766666</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/meja_kantin/model.sdf</uri>
+      <name>meja_kantin_008</name>
+      <pose>-2.86842 2.16044 0 0 0 0.766666</pose>
+    </include>
+
+    <!-- Large Pillars -->
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/tiang_besar/model.sdf</uri>
+      <name>tiang_besar_001</name>
+      <pose>-13.0328 -3.02458 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/tiang_besar/model.sdf</uri>
+      <name>tiang_besar_002</name>
+      <pose>-13.0085 -0.869689 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/tiang_besar/model.sdf</uri>
+      <name>tiang_besar_003</name>
+      <pose>-10.8868 -2.98962 0 0 0 -0.001203</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/tiang_besar/model.sdf</uri>
+      <name>tiang_besar_004</name>
+      <pose>-8.73662 -0.861969 0 0 0 0</pose>
+    </include>
+
+    <!-- Tables Under Stairs -->
+    <!-- Removed meja_bawah_tangga_001 and meja_bawah_tangga_002 -->
+
+    <!-- Connected Chairs -->
+    <!-- Removed kursi_sambung3_001 and kursi_sambung3_002 -->
+
+    <!-- Add kursi_kantin models with offset from complete1.sdf -->
+   
+
+    <!-- Pots -->
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/pot/model.sdf</uri>
+      <name>pot_001</name>
+      <pose>-10.5189 0.809785 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/pot/model.sdf</uri>
+      <name>pot_002</name>
+      <pose>-6.77506 0.802793 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/pot/model.sdf</uri>
+      <name>pot_003</name>
+      <pose>4.53676 -2.84533 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/pot/model.sdf</uri>
+      <name>pot_004</name>
+      <pose>10.2537 -2.68611 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/pot/model.sdf</uri>
+      <name>pot_005</name>
+      <pose>16.8749 -0.479687 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/pot/model.sdf</uri>
+      <name>pot_006</name>
+      <pose>16.5851 1.24505 0 0 0 0</pose>
+    </include>
+
+    <!-- White Chairs -->
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/kursi_putih/model.sdf</uri>
+      <name>kursi_putih_001</name>
+      <pose>-11.225 -2.67918 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>file:///home/nuby/bcr_ws/src/bcr_bot/models/kursi_putih/model.sdf</uri>
+      <name>kursi_putih_002</name>
+      <pose>-10.1518 -3.01553 0 0 0 0</pose>
+    </include>
+
+    <!-- Patterned Chairs -->
+    <!-- Removed all kursi_corak models temporarily -->
+
+    <!-- Boards/Panels -->
+    <!-- Removed papan_001 -->
+  </world>
+</sdf> 
